@@ -1,0 +1,60 @@
+MODULE main
+  VAR
+   state: {Initial, Ready, Inserting, Enabled, Emitting, Returning, Final};
+   amount: 0..1500;
+   coin : {100, 500}; 
+   event: {NONE, On, Off, Insert, Choose, Complete};
+   time : 0..11;
+  DEFINE
+   COST:= 500;
+
+  ASSIGN
+    init(amount):= 0;
+    init(time):=0;
+    init(state):= Initial;
+    init(event):= NONE;
+
+    next(state):= case
+        state = Initial & event = On   : Ready;
+        state = Ready & event = Insert : Inserting;
+        state = Ready & event = Off    : Final;
+        state = Inserting & amount < 500 & time < 10 : Inserting;
+        state = Inserting & amount >= 500 : Enabled;
+        state = Inserting & amount < 500 & time >= 10 : Returning;
+        state = Enabled & event = Choose & time < 10  : Emitting;
+        state = Enabled & time >=10    : Returning;
+        state = Emitting & event = Complete & amount >0 : Returning;
+        state = Emitting & event = Complete & amount = 0 : Ready;
+        state = Returning & event = Complete & amount =0  : Ready;
+        TRUE                                  : state;
+    esac;
+
+    next(amount):= case
+        amount + coin > 1500 : amount;
+        state = Initial & event = On   : 0;
+        state = Ready & event = Insert : amount+coin ;
+        state = Inserting & event =Insert &  time < 10 : amount+coin;
+        state = Enabled & event = Choose & time < 10 & amount -COST >=500  : amount - COST;
+        state = Returning & event = Complete  : 0;
+        TRUE                                  : amount;
+    esac; 
+    
+    next(time):= case
+        time +1 > 10   : time;
+        state = Initial & event = On   : 0;
+        state = Ready & event = Insert : 0;
+        state = Inserting & event = Insert & time < 10 : 0;
+        state = Inserting & time < 10 : time +1;
+        state = Inserting & amount >= 500 : 0;
+        state = Enabled & event = Choose & time < 10  : 0;
+        state = Enabled &  time < 10  : time+1;
+        state = Returning & event = Complete  : 0;
+        TRUE                                  : time;
+    esac; 
+
+LTLSPEC G(state != Inserting)
+LTLSPEC G(amount < 500)
+LTLSPEC G(state != Enabled)
+LTLSPEC G(state != Emitting)
+LTLSPEC G(state != Returning)
+LTLSPEC G(state = Inserting -> !F state= Returning)
